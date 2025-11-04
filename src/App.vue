@@ -80,8 +80,9 @@ if (navigator.geolocation) {
   )
 }
 
-async function getWeather({latitude, longitude}) {
+async function getWeather({latitude, longitude}: {latitude: number, longitude: number}) {
   //const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${apiKey}`;
+  // using openweather api through scrimba, no need for api key
   const url = `https://apis.scrimba.com/openweathermap/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric`;
   const res = await fetch(url)
   return await res.json()
