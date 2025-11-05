@@ -1,16 +1,6 @@
 <script setup lang="ts">
 import { ref ,onMounted, onUnmounted } from 'vue'
 
-defineProps<{ 
-  time: string,
-  author: string,
-  crypto: string,
-  cryptoIcon: string,
-  cryptoPrice: number,
-  weather: string,
-  weatherIcon: string 
-}>()
-
 const time = ref("TIME HERE")
 const author = ref("")
 const crypto = ref("")
@@ -25,7 +15,7 @@ fetch("https://apis.scrimba.com/unsplash/photos/random?orientation=landscape&que
   .then(data => {
     document.body.style.backgroundImage = `url(${data.urls.full})`
     author.value = data.user.name
-    console.log(data.urls.full)
+   //console.log(data.urls.full)
   })
   .catch(error => {
     console.error(error)
@@ -37,7 +27,7 @@ fetch("https://apis.scrimba.com/unsplash/photos/random?orientation=landscape&que
 fetch("https://api.coingecko.com/api/v3/coins/bitcoin")
     .then(res => res.json())
     .then(data => {
-      console.log(data)
+      //console.log(data)
       crypto.value = data.name
       cryptoIcon.value = data.image.small
       cryptoPrice.value = data.market_data.current_price.aud
@@ -49,7 +39,7 @@ function currency(number: number) {
 }
 
 
-// time
+// clock
 let timer: number | undefined
 
 onMounted(() => {
@@ -67,25 +57,95 @@ const updateClock = () => {
   })
 }
 
-// weather
+async function getIP() {
+  console.log("using IP")  
+  try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        //console.log(data.ip);
+        return data.ip
+    } catch (error) {
+        console.error('Error fetching IP address:', error);
+    }
+}
+
+async function getGeolocation() {
+  // get users IP to query their city
+  const IPAddress = await getIP()
+  // returns city, country, lat & long
+  const url = `https://ip-geo-location10.p.rapidapi.com/ip?ip=${IPAddress}`;
+  const options = {
+    method: 'GET',
+    headers: {
+      'x-rapidapi-key': 'f9414091f9msh541ce9de998bbddp162ff3jsn0cbceac33b00',
+      'x-rapidapi-host': 'ip-geo-location10.p.rapidapi.com'
+    }
+  };
+
+  try {
+    const response = await fetch(url, options);
+    const data = await response.json();
+    //console.log(data);
+    return data.result
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// prompt user to allow location
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(
       async ({coords})=> {
-        const locWeather = await getWeather(coords)
-        console.log(locWeather)
-        weatherIcon.value = `https://openweathermap.org/img/wn/${locWeather.weather[0].icon}.png`
-        weather.value = `${locWeather.name} ${Math.round(locWeather.main.temp)}˚C`
+        console.log('coords: ', coords)
+        getWeather(coords)
       }, 
-      err => console.log(err)
+      async err => {
+        console.log(err)
+        const coords = await getGeolocation()
+        getWeather(coords)
+      }, {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0,
+      }
   )
 }
+
+// for location permission changes
+navigator.permissions.query({name: 'geolocation'})
+  .then(permission => {
+      permission.onchange = async () => {
+        // check for user permissions. If granted then get their currentPosition
+        // otherwise we'll use their IP to get the city they're in
+        //console.log("permission: ", permission.state)
+        if (permission.state === 'granted') {
+            navigator.geolocation.getCurrentPosition(
+                async ({coords})=> {
+                  getWeather(coords)
+                }, 
+                async err => {
+                  console.log(err, "permissions not granted")
+                  const coords = await getGeolocation()
+                  getWeather(coords)
+                }
+            )
+        } else {
+          const coords = await getGeolocation()
+          getWeather(coords)
+        }
+      }
+  })
 
 async function getWeather({latitude, longitude}: {latitude: number, longitude: number}) {
   //const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${apiKey}`;
   // using openweather api through scrimba, no need for api key
   const url = `https://apis.scrimba.com/openweathermap/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric`;
   const res = await fetch(url)
-  return await res.json()
+  const data = await res.json()
+  //console.log('weather: ',data)
+  weatherIcon.value = `https://openweathermap.org/img/wn/${data.weather[0].icon}.png`
+  weather.value = `${data.name} ${Math.round(data.main.temp)}˚C`
+  //return await res.json()
 }
 
 </script>
@@ -100,7 +160,7 @@ async function getWeather({latitude, longitude}: {latitude: number, longitude: n
         <p>{{ currency(cryptoPrice) }} AUD</p>
       </div>
     </div>
-    <div class="weather">
+    <div v-if="weather" class="weather">
       <img :src="weatherIcon" />
       <p>{{ weather }}</p>
     </div>
@@ -122,6 +182,10 @@ main {
 
 h1 {
   align-self: center;
+}
+
+p {
+  margin: 0;
 }
 
 .top {
@@ -149,7 +213,4 @@ h1 {
     object-fit: cover;
 }
 
-.weather p {
-  margin: 0;
-}
 </style>
